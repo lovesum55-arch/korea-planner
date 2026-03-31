@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>首爾自助旅行</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        khaki: {
+                            50: '#FAF8F5',
+                            100: '#F5F0E6',
+                            200: '#E8DCC4',
+                            300: '#DBC7A1',
+                            400: '#CDB27E',
+                            500: '#C09D5B',
+                            600: '#A38245',
+                            700: '#7A6134',
+                            800: '#524123',
+                            900: '#292011',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #FAF8F5; -webkit-tap-highlight-color: transparent; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); }
+    </style>
+</head>
+<body class="text-gray-800 antialiased">
+    <div id="app" class="max-w-md mx-auto bg-khaki-50 min-h-screen relative shadow-xl overflow-hidden">
+        
+        <!-- 頁首圖片與圓弧設計 -->
+        <div class="relative h-64 bg-cover bg-center rounded-b-[2.5rem] z-10 shadow-sm" 
+             style="background-image: url('https://images.unsplash.com/photo-1538485399081-7191377e8241?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');">
+            <div class="absolute inset-0 bg-black bg-opacity-20 rounded-b-[2.5rem]"></div>
+            <div class="absolute top-10 left-6 text-white text-shadow">
+                <h1 class="text-3xl font-bold tracking-wider">首爾之旅</h1>
+                <p class="text-sm mt-1 opacity-90">2026.04.05 - 04.08</p>
+            </div>
+            
+            <!-- 浮動 Tab 按鈕 -->
+            <div class="absolute bottom-6 right-6 flex space-x-3 z-30">
+                <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id"
+                        class="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-md"
+                        :class="currentTab === tab.id ? 'bg-khaki-600 text-white scale-110' : 'bg-white text-khaki-600 opacity-90'">
+                    <i :class="tab.icon"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 主內容區域 (負邊距向上拉動) -->
+        <div class="relative z-20 -mt-12 bg-khaki-50 min-h-screen rounded-t-[2.5rem] px-5 pt-14 pb-24">
+            
+            <!-- 1. 每日行程表 -->
+            <div v-show="currentTab === 'itinerary'" class="animate-fade-in">
+                <!-- 天氣資訊 -->
+                <div class="glass-panel rounded-2xl p-4 mb-6 flex justify-between items-center shadow-sm border border-khaki-100">
+                    <div>
+                        <p class="text-xs text-khaki-600 font-medium">今日首爾天氣</p>
+                        <p class="text-2xl font-bold text-gray-700 mt-1">15°C</p>
+                    </div>
+                    <div class="text-right flex items-center gap-3">
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500">體感 14°C</p>
+                            <p class="text-xs text-gray-500">晴時多雲</p>
+                        </div>
+                        <i class="fa-solid fa-cloud-sun text-3xl text-khaki-500"></i>
+                    </div>
+                </div>
+
+                <!-- 日期橫向滑動選單 -->
+                <div class="flex overflow-x-auto hide-scrollbar space-x-4 mb-6 pb-2">
+                    <div v-for="day in days" :key="day.date" @click="selectedDay = day.id"
+                         class="flex-shrink-0 flex flex-col items-center justify-center w-16 h-20 rounded-2xl cursor-pointer transition-colors"
+                         :class="selectedDay === day.id ? 'bg-khaki-600 text-white shadow-md' : 'bg-white text-gray-500 border border-khaki-200'">
+                        <span class="text-lg font-bold">{{ day.weekday }}</span>
+                        <span class="text-xs mt-1">{{ day.date }}</span>
+                    </div>
+                </div>
+
+                <!-- 行程卡片列表 -->
+                <div class="space-y-4">
+                    <div v-for="(item, index) in currentDayItinerary" :key="index">
+                        
+                        <!-- 交通時間 (除了第一個) -->
+                        <div v-if="index > 0" class="flex items-center justify-center py-2 text-khaki-400 text-xs">
+                            <i class="fa-solid fa-ellipsis-vertical mr-2"></i>
+                            <i :class="getTransportIcon(item.transportType)" class="mr-1"></i>
+                            <span>{{ item.transportTime }}</span>
+                        </div>
+
+                        <!-- 航班特殊卡片 -->
+                        <div v-if="item.type === 'flight'" class="bg-[#4A7C7A] text-white rounded-2xl p-4 shadow-md relative overflow-hidden">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-xs opacity-80">{{ item.date }} | {{ item.flightNo }}</span>
+                                <span class="text-xs bg-white/20 px-2 py-1 rounded-full">已確認</span>
+                            </div>
+                            <h3 class="text-xl font-bold mb-4">{{ item.title }}</h3>
+                            <div class="flex justify-between items-center relative">
+                                <div class="text-center z-10">
+                                    <p class="text-2xl font-light">{{ item.depTime }}</p>
+                                    <p class="text-xl font-bold mt-1">{{ item.depAirport }}</p>
+                                </div>
+                                <div class="flex-1 px-4 relative z-10">
+                                    <div class="text-center text-xs opacity-80 mb-1">{{ item.duration }}</div>
+                                    <div class="h-[2px] bg-white/30 w-full relative">
+                                        <i class="fa-solid fa-plane absolute top-1/2 -translate-y-1/2 left-0 text-white"></i>
+                                        <div class="w-2 h-2 rounded-full bg-white absolute top-1/2 -translate-y-1/2 right-0"></div>
+                                    </div>
+                                </div>
+                                <div class="text-center z-10">
+                                    <p class="text-2xl font-light">{{ item.arrTime }}</p>
+                                    <p class="text-xl font-bold mt-1">{{ item.arrAirport }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 一般行程卡片 -->
+                        <div v-else class="bg-white rounded-2xl p-4 shadow-sm border border-khaki-100 flex gap-4 relative group">
+                            <div class="w-12 h-12 rounded-full bg-khaki-100 flex items-center justify-center flex-shrink-0 text-khaki-600">
+                                <i :class="getCategoryIcon(item.category)"></i>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-gray-800 text-lg">{{ item.name }}</h3>
+                                    <span class="text-xs text-khaki-500 font-medium">{{ item.time }}</span>
+                                </div>
+                                <p v-if="item.notes" class="text-sm text-gray-500 mt-1">{{ item.notes }}</p>
+                                
+                                <div class="mt-3 flex gap-2">
+                                    <a :href="'https://map.naver.com/v5/search/' + encodeURIComponent(item.name)" target="_blank" 
+                                       class="text-xs bg-khaki-50 text-khaki-700 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-khaki-100">
+                                        <i class="fa-solid fa-map-location-dot"></i> 導航
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 新增按鈕 -->
+                <button class="fixed bottom-6 right-6 w-14 h-14 bg-khaki-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40 hover:bg-khaki-800 transition-colors">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+
+            <!-- 2. 資訊 -->
+            <div v-show="currentTab === 'info'" class="space-y-6 animate-fade-in">
+                <!-- 匯率換算 -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-khaki-100">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-money-bill-transfer text-khaki-500"></i> 匯率換算</h3>
+                    <div class="flex items-center gap-4">
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500">韓元 (KRW)</label>
+                            <input type="number" v-model="krwInput" class="w-full border-b-2 border-khaki-200 py-1 focus:outline-none focus:border-khaki-500 bg-transparent text-lg">
+                        </div>
+                        <i class="fa-solid fa-arrow-right-arrow-left text-khaki-300 mt-4"></i>
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500">港幣 (HKD)</label>
+                            <div class="w-full border-b-2 border-transparent py-1 text-lg font-bold text-khaki-700">
+                                ${{ (krwInput * exchangeRate).toFixed(2) }}
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-2 text-right">參考匯率: 1 KRW = {{ exchangeRate }} HKD</p>
+                </div>
+
+                <!-- 住宿資訊 -->
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-khaki-100">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="font-bold text-gray-800 flex items-center gap-2"><i class="fa-solid fa-bed text-khaki-500"></i> 住宿資訊</h3>
+                        <i class="fa-brands fa-airbnb text-red-500 text-xl"></i>
+                    </div>
+                    <h4 class="font-bold text-md mb-2">首爾站、淑大入口站步行3分鐘...</h4>
+                    <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+                        <div>
+                            <p class="text-gray-500 text-xs">入住</p>
+                            <p class="font-medium">4月5日 15:00</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-xs">退房</p>
+                            <p class="font-medium">4月8日 11:00</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <p class="flex items-start gap-2"><i class="fa-solid fa-location-dot mt-1 text-khaki-400"></i> <span>11-29 Hangang-daero 76-gil 101호, 首爾 04352</span></p>
+                        <p class="flex items-center gap-2"><i class="fa-solid fa-phone text-khaki-400"></i> <span>+82 10-9941-2750 (Mini)</span></p>
+                    </div>
+                    <a href="https://map.naver.com/v5/search/11-29%20Hangang-daero%2076-gil" target="_blank" class="mt-4 block text-center bg-khaki-100 text-khaki-700 py-2 rounded-xl text-sm font-medium">開啟 Naver 導航</a>
+                </div>
+            </div>
+
+            <!-- 3. 購物清單 -->
+            <div v-show="currentTab === 'shopping'" class="animate-fade-in">
+                <div class="grid grid-cols-2 gap-4">
+                    <div v-for="(item, index) in shoppingList" :key="index" class="bg-white rounded-2xl p-3 shadow-sm border border-khaki-100">
+                        <div class="h-24 bg-khaki-100 rounded-xl mb-3 flex items-center justify-center overflow-hidden">
+                            <i v-if="!item.img" class="fa-solid fa-image text-khaki-300 text-2xl"></i>
+                            <img v-else :src="item.img" class="w-full h-full object-cover">
+                        </div>
+                        <h4 class="font-medium text-sm text-gray-800">{{ item.name }}</h4>
+                        <div class="mt-2 flex justify-between items-center">
+                            <span class="text-xs text-gray-500">{{ item.price }} KRW</span>
+                            <input type="checkbox" class="accent-khaki-600 w-4 h-4 rounded">
+                        </div>
+                    </div>
+                </div>
+                <button class="fixed bottom-6 right-6 w-14 h-14 bg-khaki-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40 hover:bg-khaki-800 transition-colors">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+
+            <!-- 4. 花費 -->
+            <div v-show="currentTab === 'expenses'" class="animate-fade-in">
+                <div class="bg-khaki-700 text-white rounded-2xl p-6 mb-6 shadow-md text-center">
+                    <p class="text-sm opacity-80 mb-1">總花費 (KRW)</p>
+                    <h2 class="text-3xl font-bold">₩ 450,000</h2>
+                    <p class="text-xs mt-2 opacity-70">約 HKD ${{ (450000 * exchangeRate).toFixed(0) }}</p>
+                </div>
+
+                <div class="space-y-3">
+                    <div v-for="(exp, index) in expenses" :key="index" class="bg-white p-4 rounded-2xl shadow-sm border border-khaki-100 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-khaki-50 flex items-center justify-center text-khaki-600">
+                                <i :class="getCategoryIcon(exp.category)"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-gray-800">{{ exp.name }}</h4>
+                                <p class="text-xs text-gray-500">{{ exp.date }} · {{ exp.method }}</p>
+                            </div>
+                        </div>
+                        <div class="text-right font-bold text-khaki-700">
+                            ₩ {{ exp.amount.toLocaleString() }}
+                        </div>
+                    </div>
+                </div>
+                <button class="fixed bottom-6 right-6 w-14 h-14 bg-khaki-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40 hover:bg-khaki-800 transition-colors">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    currentTab: 'itinerary',
+                    tabs: [
+                        { id: 'itinerary', icon: 'fa-solid fa-location-dot' },
+                        { id: 'info', icon: 'fa-solid fa-circle-info' },
+                        { id: 'shopping', icon: 'fa-solid fa-basket-shopping' },
+                        { id: 'expenses', icon: 'fa-solid fa-won-sign' }
+                    ],
+                    selectedDay: 1,
+                    days: [
+                        { id: 1, weekday: 'Sun', date: '5' },
+                        { id: 2, weekday: 'Mon', date: '6' },
+                        { id: 3, weekday: 'Tue', date: '7' },
+                        { id: 4, weekday: 'Wed', date: '8' }
+                    ],
+                    krwInput: 10000,
+                    exchangeRate: 0.0058, // 模擬匯率
+                    itineraryData: {
+                        1: [
+                            { type: 'flight', title: '香港 至 首爾', date: '2026年04月05日 (日)', flightNo: 'CX 434', depTime: '07:55', depAirport: 'HKG', arrTime: '12:40', arrAirport: 'ICN', duration: '3小時 45分' },
+                            { type: 'normal', category: 'transport', name: '搭乘 6001 巴士', time: '14:00 - 15:30', notes: '前往市區', transportType: 'walk', transportTime: '步行 5 分鐘' },
+                            { type: 'normal', category: 'food', name: 'Ilpyeon 韓牛 (明洞)', time: '16:45 - 18:30', notes: '晚餐', transportType: 'bus', transportTime: '大眾運輸 30 分鐘' },
+                            { type: 'normal', category: 'shopping', name: '明洞商圈', time: '19:00 - 22:00', notes: '逛街購物', transportType: 'walk', transportTime: '步行 10 分鐘' }
+                        ],
+                        2: [
+                            { type: 'normal', category: 'food', name: '元奶奶包肉', time: '11:30 - 13:00', notes: '午餐', transportType: 'subway', transportTime: '地鐵 20 分鐘 (從飯店出發)' },
+                            { type: 'normal', category: 'attraction', name: '延南洞', time: '13:00 - 15:00', notes: '逛街', transportType: 'walk', transportTime: '步行 15 分鐘' },
+                            { type: 'normal', category: 'food', name: '弘大 Cafe', time: '15:00 - 16:00', notes: '下午茶', transportType: 'walk', transportTime: '步行 5 分鐘' },
+                            { type: 'normal', category: 'shopping', name: '弘大商圈', time: '16:00 - 19:30', notes: '逛街', transportType: 'walk', transportTime: '步行 10 分鐘' },
+                            { type: 'normal', category: 'food', name: '人蔘雞湯', time: '19:30 - 20:30', notes: '晚餐', transportType: 'walk', transportTime: '步行 10 分鐘' }
+                        ],
+                        3: [
+                            { type: 'normal', category: 'attraction', name: '奉恩寺', time: '11:00 - 11:30', notes: '參觀', transportType: 'subway', transportTime: '地鐵 40 分鐘' },
+                            { type: 'normal', category: 'food', name: 'Jojo 刀削麵', time: '12:00 - 13:30', notes: '午餐', transportType: 'walk', transportTime: '步行 15 分鐘' },
+                            { type: 'normal', category: 'shopping', name: '聖水洞', time: '13:30 - 16:00', notes: '逛街', transportType: 'subway', transportTime: '地鐵 20 分鐘' },
+                            { type: 'normal', category: 'food', name: 'Cafe Onion', time: '16:30 - 17:00', notes: '下午茶', transportType: 'walk', transportTime: '步行 10 分鐘' },
+                            { type: 'normal', category: 'shopping', name: '樂天超市 (首爾站)', time: '17:30 - 19:00', notes: '採買伴手禮', transportType: 'subway', transportTime: '地鐵 30 分鐘' },
+                            { type: 'normal', category: 'food', name: 'Puradak 炸雞', time: '19:00 - 20:30', notes: '晚餐', transportType: 'walk', transportTime: '步行 5 分鐘' }
+                        ],
+                        4: [
+                            { type: 'normal', category: 'food', name: '香港飯店0401', time: '11:00 - 12:30', notes: '午餐', transportType: 'subway', transportTime: '地鐵 15 分鐘' },
+                            { type: 'normal', category: 'shopping', name: '東大門', time: '12:30 - 15:30', notes: '最後採買', transportType: 'walk', transportTime: '步行 5 分鐘' },
+                            { type: 'normal', category: 'transport', name: '搭乘 6002 巴士', time: '15:30 - 17:00', notes: '前往機場', transportType: 'walk', transportTime: '步行 10 分鐘' },
+                            { type: 'flight', title: '首爾 至 香港', date: '2026年04月08日 (三)', flightNo: 'CX 419', depTime: '20:05', depAirport: 'ICN', arrTime: '23:00', arrAirport: 'HKG', duration: '3小時 55分' }
+                        ]
+                    },
+                    shoppingList: [
+                        { name: 'Olive Young 面膜', price: '30,000', img: '' },
+                        { name: 'Gentle Monster 墨鏡', price: '280,000', img: '' },
+                        { name: 'Tamburins 護手霜', price: '32,000', img: '' }
+                    ],
+                    expenses: [
+                        { category: 'food', name: 'Ilpyeon 韓牛', date: '04/05', amount: 120000, method: '信用卡' },
+                        { category: 'transport', name: 'T-money 儲值', date: '04/05', amount: 50000, method: '現金' },
+                        { category: 'shopping', name: 'Olive Young', date: '04/06', amount: 85000, method: '信用卡' }
+                    ]
+                }
+            },
+            computed: {
+                currentDayItinerary() {
+                    return this.itineraryData[this.selectedDay] || [];
+                }
+            },
+            methods: {
+                getCategoryIcon(cat) {
+                    const icons = {
+                        'food': 'fa-solid fa-utensils',
+                        'attraction': 'fa-solid fa-camera',
+                        'shopping': 'fa-solid fa-bag-shopping',
+                        'transport': 'fa-solid fa-bus',
+                        'hotel': 'fa-solid fa-bed'
+                    };
+                    return icons[cat] || 'fa-solid fa-star';
+                },
+                getTransportIcon(type) {
+                    const icons = {
+                        'walk': 'fa-solid fa-person-walking',
+                        'bus': 'fa-solid fa-bus-simple',
+                        'subway': 'fa-solid fa-train-subway',
+                        'car': 'fa-solid fa-car'
+                    };
+                    return icons[type] || 'fa-solid fa-arrow-down';
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
